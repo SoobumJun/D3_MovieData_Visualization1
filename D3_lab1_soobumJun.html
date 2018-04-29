@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-color.v1.min.js"></script>
+    <script src="https://d3js.org/d3-interpolate.v1.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+</head>
+<body>
+<style>
+    body {
+        width: 80%;
+        margin: 0 auto;
+        padding-top: 10px;
+    }
+    div.tooltip {
+        position: absolute;
+        text-align: center;
+        width: 60px;
+        padding: 2px;
+        font: 12px sans-serif;
+        background: lightsteelblue;
+        border: 0px;
+        border-radius: 8px;
+        pointer-events: none;
+    }
+
+</style>
+<script>
+    var DATA_PATH = 'movies_lab.json';
+	var margin = {top: 20, right: 30, bottom: 60, left: 80},
+	    width = document.body.clientWidth - margin.left - margin.right,
+	    height = 500 - margin.top - margin.bottom,
+        titleMargin = 15;
+
+	function getSection1(data) {
+        obj = {};
+        for (i = 0; i < data.length; i++) {
+            if (obj[data[i]["Major_Genre"]] == null) {
+                obj[data[i]["Major_Genre"]] = {
+                    'sum': data[i]["Worldwide_Gross"],
+                    'count': 1
+                };
+            }
+            else {
+                obj[data[i]["Major_Genre"]].sum += data[i]["Worldwide_Gross"];
+                obj[data[i]["Major_Genre"]].count++;
+            }
+        }
+
+        avrg = [];
+        for (var key in obj) {
+            var content = {
+                genre: key,
+                average: obj[key].sum / obj[key].count
+            };
+            avrg.push(content)
+        }
+
+        list_genre = [];
+        list_average = [];
+        for (var i in avrg) {
+            list_genre.push(avrg[i].genre);
+            list_average.push(avrg[i].average);
+        }
+
+        var x = d3.scaleBand()
+            .range([0, width])
+            .padding(0.1);
+        var y = d3.scaleLinear()
+            .range([height, 0]);
+        var svg = d3.select("body")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + (margin.top + titleMargin) + ")");
+
+        max_average = d3.max(list_average);
+        x.domain(list_genre);
+        y.domain([0, max_average]); //list 로 해야 max value가 됨
+        var color = d3.scaleSequential(d3.interpolateGreens).domain([0, max_average]);
+
+        svg.append("text")
+            .style("font-size", "19px")
+            .style("font-weight", "bold")
+            .attr('dy', -titleMargin)
+            .text("Average World Wide Gross by Genre");
+
+        svg.selectAll(".bar")
+            .data(avrg)
+            .enter().append("rect")
+            .attr("class", "bar")
+            .attr("x", function (d) {
+                return x(d.genre);
+            })
+            .attr("width", x.bandwidth())
+            .attr("y", function (d) {
+                return y(d.average);
+            })
+            .attr("height", function (d) {
+                return height - y(d.average);
+            })
+            .style('fill', function (d) {
+                return color(d.average);
+            });
+
+        // add the x Axis
+        svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x));
+
+        // add the y Axis
+        svg.append("g")
+            .attr("transform", "translate(0, 0)")
+            .call(d3.axisLeft(y));
+    }
+
+
+    function getSection2(data) {
+	    var rowCt = 8;
+        var colCt = 5;
+        var chartWidth = width / colCt - margin.right,
+            chartHeight = (height + 1300) / rowCt - margin.top - margin.bottom;
+        var x = d3.scaleBand()
+	                .range([0, chartWidth])
+	                .padding(0.1);
+        var y = d3.scaleLinear()
+                    .range([chartHeight, 0]);
+
+        var movies = [];
+        var maxGross = 0;
+        for (var i = 0; i < data.length; i++) {
+            movies.push({
+                title: data[i]["Title"],
+                chartVal: [
+                    {range: "US", gross: data[i]["US_Gross"], color: '#0074af'},
+                    {range: "WorldWide", gross: data[i]["Worldwide_Gross"], color: '#ff7400'}
+                ]
+            });
+            maxGross = data[i]["US_Gross"] > maxGross ? data[i]["US_Gross"] : maxGross;
+            maxGross = data[i]["Worldwide_Gross"] > maxGross ? data[i]["Worldwide_Gross"] : maxGross;
+        }
+
+        x.domain(['US', 'WorldWide']);
+	   	y.domain([0, maxGross]);
+
+        for (var i = 0; i < rowCt; i++) {
+            for (var j = 0; j < colCt; j++) {
+                var realWidth = j == 0 ? chartWidth + margin.left + margin.right : chartWidth + margin.right;
+                var realTrans = j == 0
+                    ? "translate(" + margin.left + "," + margin.top + ")"
+                    : "translate(" + "0" + "," + margin.top + ")";
+
+                var svg = d3.select("body")
+                    .append("svg")
+                    .attr("width", realWidth)
+                    .attr("height", chartHeight + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", realTrans);
+
+                var div = d3.select("body").append("div")
+                            .attr("class", "tooltip")
+                            .style("opacity", 0);
+
+                svg.append("text")
+                    .style("font-size", "13px")
+                    .text(movies[i * colCt + j].title);
+
+
+                svg.selectAll(".bar")
+                    .data(movies[i * colCt + j].chartVal)
+                    .enter().append("rect")
+                    .attr("class", "bar")
+                    .attr("x", function (d) {
+                        return x(d.range);
+                    })
+                    .attr("width", x.bandwidth())
+                    .attr("y", function (d) {
+                        return y(d.gross);
+                    })
+                    .attr("height", function (d) {
+                        return chartHeight - y(d.gross);
+                    })
+                    .style('fill', function (d) {
+                        return d.color;
+                    }).on("mouseover", function (d) {
+                        div.transition()
+                            .duration(200)
+                            .style("opacity", .9);
+                        div.html(d.gross)
+                            .style("left", (d3.event.pageX) + "px")
+                            .style("top", (d3.event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function (d) {
+                        div.transition()
+                            .duration(500)
+                            .style("opacity", 0)
+                    });
+
+                // add the x Axis
+                svg.append("g")
+                    .attr("transform", "translate(0," + chartHeight + ")")
+                    .call(d3.axisBottom(x));
+
+                if (j == 0) {
+                    // add the y Axis
+                    svg.append("g")
+                        .attr("transform", "translate(0, 0)")
+                        .call(d3.axisLeft(y));
+                }
+            }
+        }
+    }
+
+
+	d3.json(DATA_PATH, function(error, data) {
+		if (error) throw error;
+
+		getSection1(data);
+		getSection2(data);
+	});
+
+
+</script>
+</body>
+</html>
+
+
+
